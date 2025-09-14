@@ -52,10 +52,21 @@ class GitHubService:
     def get_user_activity(self, username: str) -> Dict:
         """Get GitHub activity for a user"""
         try:
-            # Get user profile
+            # Get user profile first to validate user exists
             profile_result = self._make_request(f'/users/{username}')
             if not profile_result['success']:
-                return profile_result
+                if "user not found" in profile_result['error'].lower():
+                    return {
+                        'success': False,
+                        'error': f"GitHub user '{username}' not found. Please check the username.",
+                        'error_type': 'user_not_found'
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': f"Failed to access GitHub user '{username}': {profile_result['error']}",
+                        'error_type': 'api_error'
+                    }
             
             profile = profile_result['data']
             
@@ -67,6 +78,31 @@ class GitHubService:
             
             # Get pull requests
             prs = self._get_user_pull_requests(username)
+            
+            # Check if user has any activity
+            if not repos and not commits and not prs:
+                return {
+                    'success': True,
+                    'data': {
+                        'user': {
+                            'username': username,
+                            'name': profile.get('name', username),
+                            'company': profile.get('company', ''),
+                            'public_repos': profile.get('public_repos', 0)
+                        },
+                        'summary': {
+                            'total_repositories': 0,
+                            'total_commits': 0,
+                            'total_pull_requests': 0,
+                            'recent_commits_7d': 0,
+                            'recent_prs_7d': 0
+                        },
+                        'recent_commits': [],
+                        'repositories': [],
+                        'pull_requests': [],
+                        'message': f"{profile.get('name', username)} has no visible activity on GitHub (may be private repositories)."
+                    }
+                }
             
             # Recent activity (last 7 days)
             recent_commits = [c for c in commits if self._is_recent(c['date'], 7)]
@@ -98,7 +134,8 @@ class GitHubService:
             logger.error(f"Error getting GitHub user activity: {str(e)}")
             return {
                 'success': False,
-                'error': f"Failed to get GitHub activity: {str(e)}"
+                'error': f"Failed to get GitHub activity for '{username}': {str(e)}",
+                'error_type': 'api_error'
             }
     
     def _get_user_repositories(self, username: str) -> List[Dict]:
@@ -150,9 +187,9 @@ class GitHubService:
     def _get_user_pull_requests(self, username: str) -> List[Dict]:
         """Get user pull requests"""
         result = self._make_request('/search/issues', {
-            'q': f'type:pr author:{username}',
+            'q': f'type:pr author:{username} updated:>={self._get_date_30_days_ago()}',
             'sort': 'updated',
-            'per_page': 15
+            'per_page': 20
         })
         
         if not result['success']:
@@ -160,16 +197,26 @@ class GitHubService:
         
         pull_requests = []
         for pr in result['data'].get('items', []):
+            # Extract repo name from repository URL
+            repo_name = pr['repository_url'].split('/')[-1] if pr.get('repository_url') else 'Unknown'
+            
             pull_requests.append({
                 'number': pr['number'],
-                'title': pr['title'],
+                'title': pr['title'][:100],
                 'state': pr['state'],
-                'repository': pr['repository_url'].split('/')[-1],
+                'repository': repo_name,
                 'created_at': pr['created_at'],
-                'updated_at': pr['updated_at']
+                'updated_at': pr['updated_at'],
+                'url': pr['html_url']
             })
         
         return pull_requests
+    
+    def _get_date_30_days_ago(self) -> str:
+        """Get ISO date string for 30 days ago"""
+        from datetime import datetime, timedelta
+        thirty_days_ago = datetime.now() - timedelta(days=30)
+        return thirty_days_ago.strftime('%Y-%m-%d')
     
     def _is_recent(self, date_str: str, days: int) -> bool:
         """Check if date is within the last N days"""

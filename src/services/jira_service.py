@@ -60,7 +60,8 @@ class JiraService:
             if not found_user:
                 return {
                     'success': False,
-                    'error': f"No user found matching '{username}'"
+                    'error': f"User '{username}' not found in JIRA. Please check the username or email address.",
+                    'error_type': 'user_not_found'
                 }
             
             user_id = found_user['account_id']
@@ -69,6 +70,27 @@ class JiraService:
             # Get assigned issues
             current_issues = self._get_assigned_issues(user_id)
             recent_activity = self._get_recent_activity(user_id)
+            
+            # If no issues found at all, be explicit
+            if not current_issues and not recent_activity:
+                return {
+                    'success': True,
+                    'data': {
+                        'user': {
+                            'username': username,
+                            'display_name': user_display_name,
+                            'account_id': user_id
+                        },
+                        'summary': {
+                            'total_assigned_issues': 0,
+                            'recent_activity_count': 0,
+                            'status_breakdown': {}
+                        },
+                        'current_issues': [],
+                        'recent_activity': [],
+                        'message': f"{user_display_name} has no assigned issues or recent activity in JIRA."
+                    }
+                }
             
             # Status breakdown
             status_counts = {}
@@ -98,7 +120,8 @@ class JiraService:
             logger.error(f"Error getting JIRA user activity: {str(e)}")
             return {
                 'success': False,
-                'error': f"Failed to get JIRA activity: {str(e)}"
+                'error': f"Failed to get JIRA activity for '{username}': {str(e)}",
+                'error_type': 'api_error'
             }
     
     def _find_user(self, username: str) -> Dict:

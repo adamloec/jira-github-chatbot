@@ -1,9 +1,19 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime
+import sys
+import os
 import logging
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from services.chatbot_service import ChatbotService
 
 # Create Blueprint
 api_bp = Blueprint('api', __name__)
+
+# Initialize chatbot service
+chatbot_service = ChatbotService()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,15 +36,25 @@ def chat():
         query = data['query']
         logger.info(f"Received query: {query}")
         
-        # Placeholder response - will be replaced with actual AI processing
-        response = {
-            'query': query,
-            'response': 'Chatbot is not fully implemented yet, but I received your query!',
-            'timestamp': datetime.now().isoformat(),
-            'status': 'success'
-        }
+        # Process with chatbot service
+        result = chatbot_service.chat(query)
         
-        return jsonify(response)
+        if result['success']:
+            response = {
+                'query': query,
+                'response': result['response'],
+                'tools_used': result.get('tools_used', []),
+                'timestamp': datetime.now().isoformat(),
+                'status': 'success'
+            }
+            return jsonify(response)
+        else:
+            return jsonify({
+                'error': result['error'],
+                'query': query,
+                'timestamp': datetime.now().isoformat(),
+                'status': 'error'
+            }), 500
     
     except Exception as e:
         logger.error(f"Chat endpoint error: {str(e)}")
@@ -48,6 +68,7 @@ def api_status():
     """API status endpoint"""
     return jsonify({
         'api_status': 'operational',
+        'chatbot_configured': chatbot_service.api_key is not None,
         'endpoints': [
             {'path': '/test', 'method': 'GET'},
             {'path': '/chat', 'method': 'POST'},

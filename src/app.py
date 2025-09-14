@@ -1,8 +1,12 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os
+import sys
 from datetime import datetime
+
+# Add src to Python path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Load environment variables
 load_dotenv()
@@ -11,14 +15,23 @@ load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
-# Import API routes
-from api.routes import api_bp
-from api.jira_routes import jira_bp
-from api.github_routes import github_bp
+try:
+    from api.routes import api_bp
+    from api.jira_routes import jira_bp
+    from api.github_routes import github_bp
+    
+    app.register_blueprint(api_bp, url_prefix='/api')
+    app.register_blueprint(jira_bp, url_prefix='/api/jira')
+    app.register_blueprint(github_bp, url_prefix='/api/github')
+    print("All blueprints registered successfully")
+except ImportError as e:
+    print(f"Import error: {e}")
+    sys.exit(1)
 
-app.register_blueprint(api_bp, url_prefix='/api')
-app.register_blueprint(jira_bp, url_prefix='/api/jira')
-app.register_blueprint(github_bp, url_prefix='/api/github')
+@app.route('/')
+def home():
+    """Serve the web interface"""
+    return render_template('index.html')
 
 @app.route('/health')
 def health_check():
@@ -29,24 +42,12 @@ def health_check():
         'timestamp': datetime.now().isoformat()
     })
 
-@app.route('/')
-def index():
-    """Root endpoint"""
-    return jsonify({
-        'message': 'JIRA-GitHub Chatbot API',
-        'version': '1.0.0',
-        'endpoints': {
-            'health': '/health',
-            'api': '/api',
-            'chat': '/api/chat'
-        }
-    })
-
 if __name__ == '__main__':
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 8000))
     debug = os.getenv('FLASK_ENV') == 'development'
     
     print(f"Starting server on port {port}")
     print(f"Health check: http://localhost:{port}/health")
+    print(f"Web interface: http://localhost:{port}/")
     
     app.run(host='0.0.0.0', port=port, debug=debug)
