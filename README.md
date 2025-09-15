@@ -2,7 +2,7 @@
 
 AI-powered chatbot that answers questions about team member activities using JIRA and GitHub APIs.
 
-- Using gpt-5-mini
+- Using gpt-3.5-turbo
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ AI-powered chatbot that answers questions about team member activities using JIR
 ## Installation
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/adamloec/jira-github-chatbot
 cd jira-github-chatbot
 uv sync
 ```

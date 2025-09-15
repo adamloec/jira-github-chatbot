@@ -174,7 +174,7 @@ class JiraService:
             'fields': 'key,summary,status,priority,updated,created'
         }
         
-        result = self._make_request('/search', params)
+        result = self._make_request('/search/jql', params)
         
         if not result['success']:
             return []
@@ -203,7 +203,7 @@ class JiraService:
             'fields': 'key,summary,status,updated'
         }
         
-        result = self._make_request('/search', params)
+        result = self._make_request('/search/jql', params)
         
         if not result['success']:
             return []
