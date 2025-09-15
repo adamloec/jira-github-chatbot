@@ -11,7 +11,6 @@ jira_service = JiraService()
 github_service = GitHubService()
 user_mapping = UserMapping()
 
-# Updated tools that handle name mapping
 TOOLS = [
     {
         "type": "function",
